@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rhythm Game</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  margin: 0;
+  background: #0b0b0b;
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+  color: white;
+}
+
+#game {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+#score {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+}
+
+.lanes {
+  display: flex;
+  height: calc(100vh - 110px);
+}
+
+.lane {
+  flex: 1;
+  position: relative;
+  border-left: 1px solid #222;
+  border-right: 1px solid #222;
+}
+
+.note {
+  position: absolute;
+  top: -12vh;
+  left: 15%;
+  width: 70%;
+  height: 30vh;
+  border-radius: 16px;
+  background: #00e5ff;
+}
+
+.hit-zone {
+  position: absolute;
+  bottom: 110px;
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,0.2);
+}
+
+.buttons {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 110px;
+  display: flex;
+}
+
+.button {
+  flex: 1;
+  background: #151515;
+  border: 1px solid #333;
+  font-size: 22px;
+  color: white;
+}
+
+.button:active {
+  background: #00e5ff;
+  color: black;
+}
+
+#gameOver {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  z-index: 10;
+}
+</style>
+</head>
+
+<body>
+<div id="game">
+  <div id="score">Score: 0</div>
+
+  <div class="lanes">
+    <div class="lane" data-lane="0"></div>
+    <div class="lane" data-lane="1"></div>
+    <div class="lane" data-lane="2"></div>
+    <div class="lane" data-lane="3"></div>
+  </div>
+
+  <div class="hit-zone"></div>
+
+  <div class="buttons">
+    <button class="button" data-lane="0"></button>
+    <button class="button" data-lane="1"></button>
+    <button class="button" data-lane="2"></button>
+    <button class="button" data-lane="3"></button>
+  </div>
+
+  <div id="gameOver">GAME OVER</div>
+</div>
+
+<script>
+const lanes = document.querySelectorAll('.lane');
+const scoreEl = document.getElementById('score');
+const gameOverScreen = document.getElementById('gameOver');
+
+let score = 0;
+let gameRunning = true;
+
+let noteSpeed = 3.5;
+let spawnRate = 900;
+
+const HIT_Y = window.innerHeight - 155;
+const HIT_WINDOW = 45;
+
+function endGame() {
+  if (!gameRunning) return;
+  gameRunning = false;
+  gameOverScreen.style.display = 'flex';
+  clearInterval(spawnInterval);
+}
+
+function spawnNote() {
+  if (!gameRunning) return;
+
+  const laneIndex = Math.floor(Math.random() * 4);
+  const lane = lanes[laneIndex];
+
+  const note = document.createElement('div');
+  note.className = 'note';
+  note.dataset.lane = laneIndex;
+  note.style.top = '-12vh';
+
+  lane.appendChild(note);
+
+  note.interval = setInterval(() => {
+    if (!gameRunning) return;
+
+    const y = note.offsetTop + noteSpeed;
+    note.style.top = y + 'px';
+
+    // Missed note
+    if (y > HIT_Y + HIT_WINDOW) {
+      clearInterval(note.interval);
+      note.remove();
+      endGame();
+    }
+  }, 16);
+}
+
+function hitLane(laneIndex) {
+  if (!gameRunning) return;
+
+  const notes = [...document.querySelectorAll('.note')];
+  let hittableNotes = notes.filter(note => {
+    const noteY = note.getBoundingClientRect().top + note.offsetHeight / 2;
+    return Math.abs(noteY - HIT_Y) < HIT_WINDOW;
+  });
+
+  // No note near hit zone → ignore press (NO game over)
+  if (hittableNotes.length === 0) return;
+
+  // Check for correct lane
+  const correctNote = hittableNotes.find(
+    note => note.dataset.lane == laneIndex
+  );
+
+  if (correctNote) {
+    score += 100;
+    scoreEl.textContent = `Score: ${score}`;
+    clearInterval(correctNote.interval);
+    correctNote.remove();
+  } else {
+    // Pressed wrong lane
+    endGame();
+  }
+}
+
+// Input
+document.querySelectorAll('.button').forEach(btn => {
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    hitLane(btn.dataset.lane);
+  });
+  btn.addEventListener('mousedown', () => hitLane(btn.dataset.lane));
+});
+
+// Difficulty ramp
+setInterval(() => {
+  if (!gameRunning) return;
+  noteSpeed += 0.4;
+  spawnRate = Math.max(300, spawnRate - 50);
+  clearInterval(spawnInterval);
+  spawnInterval = setInterval(spawnNote, spawnRate);
+}, 6000);
+
+let spawnInterval = setInterval(spawnNote, spawnRate);
+</script>
+</body>
+</html>
